@@ -17,7 +17,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 
 # 精度評価用
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, f1_score, precision_recall_fscore_support
 from sklearn.metrics import recall_score
 from sklearn.metrics import precision_score
 
@@ -78,12 +78,14 @@ def st_display_graph(df: pd.DataFrame, x_col : str):
     なし
     """
 
+    # グラフ（ヒストグラム）の設定
+    # sns.countplot(data=df, x=x_col, ax=ax)
+    # sns.countplot(data=df, x=x_col)
+
     fig, ax = plt.subplots()    # グラフの描画領域を準備
     plt.grid(True)              # 目盛線を表示する
 
-    # グラフ（ヒストグラム）の設定
-    sns.countplot(data=df, x=x_col, ax=ax)
-
+    ax.hist(df[x_col])
     st.pyplot(fig)              # Streamlitでグラフを表示する
 
 
@@ -118,10 +120,24 @@ def ml_dtree(
     pred = clf.predict(X)
 
     # accuracyで精度評価
-    score = accuracy_score(y, pred)
+    score = round(accuracy_score(y, pred), 2)
+    recall = round(recall_score(y, pred, pos_label="Yes"), 2)
+    f1 = round(f1_score(y, pred, pos_label="Yes"), 2)
 
-    return [clf, pred, score]
+    return [clf, pred, score, recall, f1]
 
+def ml_rf(X, Y):
+    rf = RandomForestClassifier(random_state=0)
+
+    rf.fit(X, Y)
+
+    rf_pred = rf.predict(X)
+
+    score = round(accuracy_score(Y, rf_pred), 1)
+    recall = round(recall_score(Y, rf_pred, pos_label="Yes"), 2)
+    f1 = round(f1_score(Y, rf_pred, pos_label="Yes"), 2)
+
+    return [rf, rf_pred, score, recall, f1]
 
 def st_display_dtree(clf, features):
     """
@@ -139,19 +155,36 @@ def st_display_dtree(clf, features):
     なし
     """
 
+    # 必要なライブラリのインポート    
+    from sklearn.tree import plot_tree
+
     # 可視化する決定木の生成
-    dot = tree.export_graphviz(clf, 
-        out_file=None,  # ファイルは介さずにGraphvizにdot言語データを渡すのでNone
-        filled=True,    # Trueにすると、分岐の際にどちらのノードに多く分類されたのか色で示してくれる
-        rounded=True,   # Trueにすると、ノードの角を丸く描画する。
-    #    feature_names=['あ', 'い', 'う', 'え'], # これを指定しないとチャート上で特徴量の名前が表示されない
-        feature_names=features, # これを指定しないとチャート上で説明変数の名前が表示されない
-    #    class_names=['setosa' 'versicolor' 'virginica'], # これを指定しないとチャート上で分類名が表示されない
-        special_characters=True # 特殊文字を扱えるようにする
-        )
+    plot_tree(clf, feature_names=features, class_names=True, filled=True)
 
     # Streamlitで決定木を表示する
-    st.graphviz_chart(dot)
+    st.pyplot(plt)
+
+    # # 可視化する決定木の生成
+    # dot = tree.export_graphviz(clf, 
+    #     # out_file=None,  # ファイルは介さずにGraphvizにdot言語データを渡すのでNone
+    #     # filled=True,    # Trueにすると、分岐の際にどちらのノードに多く分類されたのか色で示してくれる
+    #     # rounded=True,   # Trueにすると、ノードの角を丸く描画する。
+    # #    feature_names=['あ', 'い', 'う', 'え'], # これを指定しないとチャート上で特徴量の名前が表示されない
+    #     # feature_names=features, # これを指定しないとチャート上で説明変数の名前が表示されない
+    # #    class_names=['setosa' 'versicolor' 'virginica'], # これを指定しないとチャート上で分類名が表示されない
+    #     # special_characters=True # 特殊文字を扱えるようにする
+    #     )
+
+    # # Streamlitで決定木を表示する
+    # st.graphviz_chart(dot)
+
+def st_display_rf(rf, train_x):
+    feat_importances = pd.Series(rf.feature_importances_, index=train_x).sort_values()
+    feat_importances = feat_importances.to_frame(name="重要度").sort_values(by='重要度', ascending=False)
+
+    feat_importances[0:20].sort_values(by="重要度").plot.barh()
+    plt.legend(loc="lower right")
+    st.pyplot(plt)
 
 
 def main():
@@ -165,30 +198,32 @@ def main():
     activities = ["データ確認", "要約統計量", "グラフ表示", "学習と検証", "About"]
     choice = st.sidebar.selectbox("Select Activity", activities)
 
-    # ファイルのアップローダー
-    uploaded_file = st.sidebar.file_uploader("訓練用データのアップロード", type='csv') 
+    # 未アップロード
+    if 'df' not in st.session_state:
+        # ファイルのアップローダー
+        uploaded_file = st.sidebar.file_uploader("訓練用データのアップロード", type='csv') 
 
-    # アップロードの有無を確認
-    if uploaded_file is not None:
+        # アップロードの有無を確認
+        if uploaded_file is not None:
 
-        # 一度、read_csvをするとインスタンスが消えるので、コピーしておく
-        ufile = copy.deepcopy(uploaded_file)
+            # 一度、read_csvをするとインスタンスが消えるので、コピーしておく
+            ufile = copy.deepcopy(uploaded_file)
 
-        try:
-            # 文字列の判定
-            pd.read_csv(ufile, encoding="utf_8_sig")
-            enc = "utf_8_sig"
-        except:
-            enc = "shift-jis"
+            try:
+                # 文字列の判定
+                pd.read_csv(ufile, encoding="utf_8_sig")
+                enc = "utf_8_sig"
+            except:
+                enc = "shift-jis"
 
-        finally:
-            # データフレームの読み込み
-            df = pd.read_csv(uploaded_file, encoding=enc) 
+            finally:
+                # データフレームの読み込み
+                df = pd.read_csv(uploaded_file, encoding=enc) 
 
-            # データフレームをセッションステートに退避（名称:df）
-            st.session_state.df = copy.deepcopy(df)
-    else:
-        st.subheader('訓練用データをアップロードしてください')
+                # データフレームをセッションステートに退避（名称:df）
+                st.session_state.df = copy.deepcopy(df)
+        else:
+            st.subheader('訓練用データをアップロードしてください')
 
     if choice == activities[0]:        
         # セッションステートにデータフレームがあるかを確認
@@ -233,19 +268,49 @@ def main():
             # セッションステートに退避していたデータフレームを復元
             df = copy.deepcopy(st.session_state.df)
 
+            train_X, valid_X, train_Y, valid_Y = train_test_split(df.drop("退職", axis=1), df["退職"], test_size=.3, random_state=0)
+
+            oversample = SMOTE(sampling_strategy=.5, random_state=0)
+            train_X_over, train_Y_over = oversample.fit_resample(train_X, train_Y)
+
             # 説明変数と目的変数の設定
-            train_X = df.drop("退職", axis=1)   # 退職列以外を説明変数にセット
-            train_Y = df["退職"]                # 退職列を目的変数にセット
+            # train_X = df.drop("退職", axis=1)   # 退職列以外を説明変数にセット
+            # train_Y = df["退職"]                # 退職列を目的変数にセット
 
-            depth = st.sidebar.selectbox('決定木の深さ(サーバーの負荷軽減の為Max=3)', range(1, 4))
-            # 決定木による予測
-            clf, train_pred, train_scores = ml_dtree(train_X, train_Y, depth)
+            ml_type = ['決定木', 'ランダムフォレスト']
+            clf = st.sidebar.selectbox('学習の手法', ml_type)
 
+            if clf == ml_type[0]:
+                depth = st.sidebar.selectbox('決定木の深さ(サーバーの負荷軽減の為Max=3)', range(1, 4))
+                # 決定木による予測
+                clf, train_pred, train_scores, recall, f1 = ml_dtree(train_X_over, train_Y_over, depth)
+
+                clf, valid_pred, valid_scores, rec2, f2 = ml_dtree(valid_X, valid_Y, depth)
+
+                st.caption("決定木の可視化")
+                # 決定木のツリーを出力
+                st_display_dtree(clf, train_X.columns)
+            else:
+                rf, train_pred, train_scores, recall, f1 = ml_rf(train_X_over, train_Y_over)
+
+                rf, valid_pred, valid_scores, rec2, f2 = ml_rf(valid_X, valid_Y)
+
+                st.caption("重要度の可視化")
+                st_display_rf(rf, train_X.columns)
+
+            st.subheader("検証用データでの予測精度")
             # 正解率を出力
-            st.subheader(f'正解率: {train_scores}')
+            st.caption("AIの予測が「全員、退職しない」に偏った場合は(意味がないので)全ての精度は0で表示されます")
+            train_col1, train_col2, train_col3 = st.columns(3)
+            train_col1.metric('正解率', train_scores)
+            train_col2.metric('再現率', recall)
+            train_col3.metric('適合率', f1)
 
-            # 決定木のツリーを出力
-            st_display_dtree(clf, train_X.columns)
+            st.subheader("訓練用データでの予測精度")
+            test_col1, test_col2, test_col3 = st.columns(3)
+            test_col1.metric('正解率', valid_scores)
+            test_col2.metric('再現率', rec2)
+            test_col3.metric('適合率', f2)
 
     elif choice == activities[4]:
         st.image("logo.png")
@@ -253,4 +318,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
