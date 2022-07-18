@@ -314,7 +314,9 @@ def main():
 
     elif choice == activities[4]:
         st.image("logo.png")
-        'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus lobortis dui eu nisi tristique tempus. Integer in enim massa. In tincidunt arcu non pellentesque tincidunt. Suspendisse vitae fermentum dui. Pellentesque nec auctor velit, a tempor neque. Morbi in leo a felis tempor mollis sit amet vel urna. Donec pretium eros id nulla egestas auctor. Donec eget scelerisque nisi, sit amet rutrum nunc. Mauris suscipit diam in tellus venenatis, eget congue sem pretium. Mauris non sagittis augue. Nulla interdum nisi vitae libero consequat, ac vehicula diam ultrices. In at finibus augue. Cras quis faucibus libero. Integer iaculis vel ante vel volutpat.'
+        'recall_scoreで参考にしたもの'
+        "https://scikit-learn.org/stable/modules/generated/sklearn.metrics.recall_score.html"
+        'https://stackoverflow.com/questions/35953300/valueerror-data-is-not-binary-and-pos-label-is-not-specified-for-roc-curve'
 
 if __name__ == "__main__":
     main()
